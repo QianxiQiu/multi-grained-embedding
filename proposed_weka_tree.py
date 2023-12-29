@@ -34,18 +34,6 @@ dic_arff_head={
                 "letter":["numeric","numeric","numeric","numeric","numeric","numeric","numeric","numeric","numeric","numeric","numeric","numeric","numeric","numeric","numeric","numeric","{Z,P,S,H,F,N,R,M,D,V,A,K,E,O,Q,L,X,Y,I,W,U,T,C,G,B,J}"]
                }
 
-class Logger(object):
-    def __init__(self, filename='default.log', stream=sys.stdout):
-        self.terminal = stream
-        self.log = open(filename, 'w')
-
-    def write(self, message):
-        self.terminal.write(message)
-        self.log.write(message)
-
-    def flush(self):
-        pass
-
 #This class is the first part of the proposed encoding method: Divide granularity and calculate probability distribution:
 class embed_trans_to_proba:
     def __init__(self,params=None):
@@ -53,7 +41,7 @@ class embed_trans_to_proba:
         if params=={}:
             self.params=None
 
-
+    # Given the index of the current feature and a list of indices for the features to search, find the feature in the list that is most relevant to the current feature.
     def find_most_relative_feature(self,now,indexes):
         max_score=0
         max_index=0
@@ -66,6 +54,7 @@ class embed_trans_to_proba:
             max_index=random.choice(indexes)
         return max_index
 
+    # Divide the dataset into subsets at multiple granularities based on feature correlations.
     def divide(self, indexes):
         # Save the subset corresponding to the current granularity division.
         self.subsets.append(copy.deepcopy(indexes))
@@ -95,11 +84,12 @@ class embed_trans_to_proba:
         self.divide(s1)
         self.divide(s2)
 
-
+    # Generate the corresponding .arff file from a .csv file.
     def csv_to_arff(self,csvpath,df,index_subset):
         global dic_arff_head
         global mydataname
         arffpath=csvpath[:csvpath.find(".csv")]+".arff"
+
         f=open(arffpath,"w+")
         #Write ARFF file header
         f.write("@relation {}\n\n".format(arffpath[28:-5]))
@@ -128,6 +118,7 @@ class embed_trans_to_proba:
         f.close()
         return arffpath
 
+    # Compute the probability distribution of classes for a subset at a particular granularity.
     def fit_one_grain(self,i,subsets):
 
         global mydataname
@@ -171,6 +162,9 @@ class embed_trans_to_proba:
 
         return proba_train, proba_test
 
+
+
+    # Calculate the class probability distribution for all subsets.
     def trans_to_proba(self):
         self.subsets_probas_train = []
         self.subsets_probas_test = []
@@ -184,11 +178,11 @@ class embed_trans_to_proba:
         self.subsets_probas_test = np.array(self.subsets_probas_test)
 
 
-
+    # To obtain the accuracy of the predictions on the test set.
     def get_predict_test(self):
         return self.precision
 
-
+    # The overall training and transformation functions for this class.
     def fit_and_transform(self,x_train,x_test,y_train,y_test,num_target):
         self.x_train=x_train
         self.x_test=x_test
@@ -215,6 +209,8 @@ class embed_temper_control:
 
 
     def temper_control(self,subsets_probas_train,subsets_probas_test,y_train,y_test,types_target,lr=None,flag_save=False,parallel="single_gpu"):
+
+        # There are three training modes for the model: cpu, single_gpu, and multi_gpu.
         if parallel =="multi_gpu":
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -240,6 +236,7 @@ class embed_temper_control:
             cost=torch.nn.NLLLoss()
             optimizer=torch.optim.SGD(model.parameters(),lr=lr)
 
+            # Train for "iterations" times.
             for j in range(self.iterations):
                 total_temper_softmax=torch.tensor(np.array([]),requires_grad=True,dtype=torch.float, device=device)
 
@@ -257,6 +254,7 @@ class embed_temper_control:
                 tempers.grad.data.zero_()
                 optimizer.zero_grad()
 
+                # After the final training iteration, calculate the prediction accuracy on the test set.
                 if j == (self.iterations-1) :
                     total_temper_softmax_test = torch.tensor(np.array([]), requires_grad=True, dtype=torch.float, device=device)
                     for i,subset in enumerate(subsets_probas_test):
@@ -293,6 +291,7 @@ class embed_temper_control:
             cost = torch.nn.NLLLoss()
             optimizer = torch.optim.SGD(model.parameters(), lr=lr)
 
+            # Train for "iterations" times.
             for j in range(self.iterations):
                 total_temper_softmax = torch.tensor(np.array([]), requires_grad=True, dtype=torch.float)
 
@@ -310,6 +309,7 @@ class embed_temper_control:
                 tempers.grad.data.zero_()
                 optimizer.zero_grad()
 
+                # After the final training iteration, calculate the prediction accuracy on the test set.
                 if j == (self.iterations - 1):
                     total_temper_softmax_test = torch.tensor(np.array([]), requires_grad=True, dtype=torch.float)
                     for i, subset in enumerate(subsets_probas_test):
@@ -349,6 +349,7 @@ class embed_temper_control:
             cost = torch.nn.NLLLoss()
             optimizer = torch.optim.SGD(model.parameters(), lr=lr)
 
+            # Train for "iterations" times.
             for j in range(self.iterations):
                 total_temper_softmax = torch.tensor(np.array([]), requires_grad=True, dtype=torch.float, device=device)
 
@@ -366,6 +367,7 @@ class embed_temper_control:
                 tempers.grad.data.zero_()
                 optimizer.zero_grad()
 
+                # After the final training iteration, calculate the prediction accuracy on the test set.
                 if j == (self.iterations - 1):
                     total_temper_softmax_test = torch.tensor(np.array([]), requires_grad=True, dtype=torch.float,
                                                              device=device)
@@ -386,7 +388,7 @@ class embed_temper_control:
                 return precision
 
 
-
+    # The overall training and transformation functions for this class.
     def fit_and_transform(self,x_train,x_test,y_train,y_test,types_target):
         for i,target in enumerate(types_target) :
             y_train[y_train==target]=int(i)
@@ -404,13 +406,15 @@ class embed_temper_control:
 
         return precsion,x_train_encoded,x_test_encoded
 
-
+# Find the value with the highest frequency in the list.
 def get_most_freq_value(list):
     if Counter(list).most_common(1)[0][1]==1:
         return random.choice(list)
     else:
         return Counter(list).most_common(1)[0][0]
 
+
+# Generate a hyperparameter search list with a length of "iters".
 def random_choice_params(iters,params_list):
     if len(params_list)>iters:
         return np.random.choice(params_list,iters,replace=False)
@@ -420,6 +424,8 @@ def random_choice_params(iters,params_list):
         result2=np.random.choice(params_list,(iters-len(params_list)),replace=True).tolist()
         return result1 + result2
 
+
+# This method is used for finding the optimal hyperparameters.
 def find_best_params(iter,train,valid,target_train,target_valid,num_target,types_target):
     num_inside_tree_list = [70, 100, 150, 200, 250, 300]
     max_depth_list = [4, 6, 8, 10, 12]
@@ -494,6 +500,8 @@ def proposed_weka_tree(data_train, data_test, target_train, target_test, datanam
         best_iterlation_list = []
         best_population_list = []
         best_lr_list = []
+
+        # Using three-fold cross-validation, divide the training set into sub-training sets and sub-validation sets. Use the accuracy of the sub-validation sets as a metric to search for the optimal hyperparameters.
         skf = StratifiedKFold(n_splits=3,shuffle=True)
         for train_index, valid_index in skf.split(data_train, target_train):
             best_iterlation, best_population,best_lr = find_best_params(10, copy.deepcopy(data_train.iloc[train_index, :]),

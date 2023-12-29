@@ -12,25 +12,12 @@ from collections import Counter
 from torch import nn
 
 
-class Logger(object):
-    def __init__(self, filename='default.log', stream=sys.stdout):
-        self.terminal = stream
-        self.log = open(filename, 'w')
-
-    def write(self, message):
-        self.terminal.write(message)
-        self.log.write(message)
-
-    def flush(self):
-        pass
-
-
-#This class is the first part of the proposed encoding method: Divide granularity and calculate probability distribution:
+# This class is the first part of the proposed encoding method: Divide granularity and calculate probability distribution:
 class embed_trans_to_proba:
     def __init__(self,params=None):
         self.params=params
 
-
+    # Given the index of the current feature and a list of indices for the features to search, find the feature in the list that is most relevant to the current feature.
     def find_most_relative_feature(self,now,indexes):
         max_score=0
         max_index=0
@@ -44,7 +31,7 @@ class embed_trans_to_proba:
         return max_index
 
 
-
+    # Divide the dataset into subsets at multiple granularities based on feature correlations.
     def divide(self,indexes):
         #Save the subset corresponding to the current granularity division.
         self.subsets.append(copy.deepcopy(indexes))
@@ -74,8 +61,9 @@ class embed_trans_to_proba:
         self.divide(s1)
         self.divide(s2)
 
-    def fit_one_grain(self,subsets,categorical_index):
 
+    # Compute the probability distribution of classes for a subset at a particular granularity.
+    def fit_one_grain(self,subsets,categorical_index):
         #Find the column indices of the categorical features in the current subset for use as parameters in the subsequent CatboostClassifier fitting below
         cat_index_list = []
         for index_cat, index_subsets in enumerate(subsets):
@@ -93,6 +81,8 @@ class embed_trans_to_proba:
         proba_test = cb.predict_proba(self.x_test.iloc[:, subsets])
         return proba_train,proba_test
 
+
+    # Calculate the class probability distribution for all subsets.
     def trans_to_proba(self, categorical_index):
         self.subsets_probas_train = []
         self.subsets_probas_test = []
@@ -106,10 +96,11 @@ class embed_trans_to_proba:
         self.subsets_probas_test = np.array(self.subsets_probas_test)
 
 
+    # To obtain the accuracy of the predictions on the test set.
     def get_predict_test(self):
         return self.precision
 
-
+    # The overall training and transformation functions for this class.
     def fit_and_transform(self,x_train,x_test,y_train,y_test,num_target):
         self.x_train=x_train
         self.x_test=x_test
@@ -123,7 +114,7 @@ class embed_trans_to_proba:
             if dtypes != "int64":
                 categorical_index.append(i)
 
-
+        # num_target: The total number of categories for the labels.
         self.labels_nums=num_target
         self.subsets = []
         cols=x_train.shape[1]
@@ -143,6 +134,8 @@ class embed_temper_control:
 
 
     def temper_control(self,subsets_probas_train,subsets_probas_test,y_train,y_test,types_target,lr=None,flag_save=False,parallel="single_gpu"):
+
+        # There are three training modes for the model: cpu, single_gpu, and multi_gpu.
         if parallel =="multi_gpu":
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -168,6 +161,7 @@ class embed_temper_control:
             cost=torch.nn.NLLLoss()
             optimizer=torch.optim.SGD(model.parameters(),lr=lr)
 
+            # Train for "iterations" times.
             for j in range(self.iterations):
                 total_temper_softmax=torch.tensor(np.array([]),requires_grad=True,dtype=torch.float, device=device)
 
@@ -185,6 +179,7 @@ class embed_temper_control:
                 tempers.grad.data.zero_()
                 optimizer.zero_grad()
 
+                # After the final training iteration, calculate the prediction accuracy on the test set.
                 if j == (self.iterations-1) :
                     total_temper_softmax_test = torch.tensor(np.array([]), requires_grad=True, dtype=torch.float, device=device)
                     for i,subset in enumerate(subsets_probas_test):
@@ -201,6 +196,7 @@ class embed_temper_control:
                 return precision,total_temper_softmax.cpu().detach().numpy(),total_temper_softmax_test.cpu().detach().numpy()
             else:
                 return precision
+
 
         elif parallel=="cpu":
             if lr is None:
@@ -221,6 +217,7 @@ class embed_temper_control:
             cost = torch.nn.NLLLoss()
             optimizer = torch.optim.SGD(model.parameters(), lr=lr)
 
+            # Train for "iterations" times.
             for j in range(self.iterations):
                 total_temper_softmax = torch.tensor(np.array([]), requires_grad=True, dtype=torch.float)
 
@@ -238,6 +235,7 @@ class embed_temper_control:
                 tempers.grad.data.zero_()
                 optimizer.zero_grad()
 
+                # After the final training iteration, calculate the prediction accuracy on the test set.
                 if j == (self.iterations - 1):
                     total_temper_softmax_test = torch.tensor(np.array([]), requires_grad=True, dtype=torch.float)
                     for i, subset in enumerate(subsets_probas_test):
@@ -277,6 +275,7 @@ class embed_temper_control:
             cost = torch.nn.NLLLoss()
             optimizer = torch.optim.SGD(model.parameters(), lr=lr)
 
+            # Train for "iterations" times.
             for j in range(self.iterations):
                 total_temper_softmax = torch.tensor(np.array([]), requires_grad=True, dtype=torch.float, device=device)
 
@@ -294,6 +293,7 @@ class embed_temper_control:
                 tempers.grad.data.zero_()
                 optimizer.zero_grad()
 
+                # After the final training iteration, calculate the prediction accuracy on the test set.
                 if j == (self.iterations - 1):
                     total_temper_softmax_test = torch.tensor(np.array([]), requires_grad=True, dtype=torch.float,
                                                              device=device)
@@ -313,7 +313,7 @@ class embed_temper_control:
             else:
                 return precision
 
-
+    # The overall training and transformation functions for this class.
     def fit_and_transform(self,x_train,x_test,y_train,y_test,types_target):
         for i,target in enumerate(types_target) :
             y_train[y_train==target]=int(i)
@@ -331,12 +331,15 @@ class embed_temper_control:
         return precsion,x_train_encoded,x_test_encoded
 
 
+# Find the value with the highest frequency in the list.
 def get_most_freq_value(list):
     if Counter(list).most_common(1)[0][1]==1:
         return random.choice(list)
     else:
         return Counter(list).most_common(1)[0][0]
 
+
+# Generate a hyperparameter search list with a length of "iters".
 def random_choice_params(iters,params_list):
     if len(params_list)>iters:
         return np.random.choice(params_list,iters,replace=False)
@@ -346,11 +349,13 @@ def random_choice_params(iters,params_list):
         result2=np.random.choice(params_list,(iters-len(params_list)),replace=True).tolist()
         return result1 + result2
 
+# This method is used for finding the optimal hyperparameters.
 def find_best_params(iter,train,valid,target_train,target_valid,num_target,types_target):
     l2_leaf_reg_list = [1,4,9,16,25,36]
     depth_list = [4,6,8,10,12]
     n_estimators_list = [70,100,150,200,250,300]
     lr_list = [1, 0.7, 0.4, 0.1, 0.07, 0.04, 0.01]
+
     random_search_l2_leaf_reg_list=random_choice_params(iter,l2_leaf_reg_list)
     random_search_depth_list=random_choice_params(iter,depth_list)
     random_search_n_estimators_list = random_choice_params(iter, n_estimators_list)
@@ -420,6 +425,8 @@ def proposed(data_train,data_test,target_train,target_test,if_adjust_hyperparame
         best_depth_list = []
         best_n_estimators_list = []
         best_lr_list = []
+
+        # Using three-fold cross-validation, divide the training set into sub-training sets and sub-validation sets. Use the accuracy of the sub-validation sets as a metric to search for the optimal hyperparameters.
         skf = StratifiedKFold(n_splits=3)
         for train_index, valid_index in skf.split(data_train, target_train):
             best_l2_leaf_reg, best_depth,best_n_estimators,best_lr = find_best_params(10, copy.deepcopy(data_train.iloc[train_index, :]),
@@ -430,6 +437,7 @@ def proposed(data_train,data_test,target_train,target_test,if_adjust_hyperparame
             best_depth_list.append(best_depth)
             best_n_estimators_list.append(best_n_estimators)
             best_lr_list.append(best_lr)
+
         final_best_l2_leaf_reg = get_most_freq_value(best_l2_leaf_reg_list)
         final_best_depth = get_most_freq_value(best_depth_list)
         final_best_n_estimators = get_most_freq_value(best_n_estimators_list)
@@ -442,6 +450,7 @@ def proposed(data_train,data_test,target_train,target_test,if_adjust_hyperparame
             params["depth"] = final_best_depth
         if final_best_n_estimators is not None:
             params["n_estimators"] = final_best_n_estimators
+
         embed = embed_trans_to_proba(params=params)
 
         if final_best_lr is not None:

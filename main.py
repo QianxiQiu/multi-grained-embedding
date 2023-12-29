@@ -43,13 +43,13 @@ if __name__ == '__main__':
         dataname=dataname + str(time),
         if_adjust_hyperparameter=True)
 
-    # GCForest(sklearn_RF)
+    # CF(tree_ensemble_method=random_forest_in_weka)
     accuracy = GCForest_weka.main(
         copy.deepcopy(data_train_encoded), copy.deepcopy(data_test_encoded),
         copy.deepcopy(target_train), copy.deepcopy(target_test), dataname=dataname,
         if_is_encoded=if_encoded)
 
-    # GCForest(weka_RF)
+    # CF(tree_ensemble_method=random_forest_in_sklearn)
     accuracy = GCForest.main(
         copy.deepcopy(data_train_encoded), copy.deepcopy(data_test_encoded),
         copy.deepcopy(target_train), copy.deepcopy(target_test))

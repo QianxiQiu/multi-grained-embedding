@@ -98,10 +98,11 @@ class GCForest:
 
         return prf_crf_pred_ref,accu_list
 
-
+    # Generate the corresponding .arff file from a .csv file.
     def csv_to_arff(self,csvpath,df):
         global dic_arff_head
         arffpath=csvpath[:csvpath.find(".csv")]+".arff"
+
         f=open(arffpath,"w+")
         #Write ARFF file header
         f.write("@relation {}\n\n".format(arffpath[14:-5]))
