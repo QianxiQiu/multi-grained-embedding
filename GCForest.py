@@ -5,7 +5,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 from copy import deepcopy
 
-
+# A simplified version of a cascading forest.
 class GCForest:
     def __init__(self,   cascade_test_size=0.2, n_cascadeRF=2, n_cascadeRFtree=101, cascade_layer=8, min_sample_cascade=0.05, tolerance=0.0, n_jobs=-1):
         self.cascade_test_size = cascade_test_size
@@ -28,6 +28,7 @@ class GCForest:
         pred_prob = self.predict_proba(X)
         return np.argmax(pred_prob, axis=1)
 
+    # Multi-layered forest.
     def cascade_forest(self, X, y=None):
         if y is not None:
             self.n_layer = 0
@@ -73,7 +74,7 @@ class GCForest:
 
         return prf_crf_pred_ref
 
-
+    # Single-layer forest.
     def _cascade_layer(self, X, y=None, layer=0):
 
         n_tree = getattr(self, 'n_cascadeRFtree')
@@ -109,14 +110,14 @@ class GCForest:
 
         return prf_crf_pred
 
-
-
+    # Used to evaluate whether to add another layer to the forest.
     def _cascade_evaluation(self, X_valid, y_valid):
         casc_pred_prob = np.mean(self.cascade_forest(X_valid), axis=0)
         casc_pred = np.argmax(casc_pred_prob, axis=1)
         casc_accuracy = accuracy_score(y_true=y_valid, y_pred=casc_pred)
         return casc_accuracy
 
+    # Generate the feature vector for the current layer of the forest.
     def _create_feat_arr(self, X, prf_crf_pred):
         swap_pred = np.swapaxes(prf_crf_pred, 0, 1)
         add_feat = swap_pred.reshape([np.shape(X)[0], -1])

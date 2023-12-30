@@ -29,7 +29,7 @@ dic_arff_head={
 
 is_encoded=None
 
-
+# A simplified version of a cascading forest.
 class GCForest:
     def __init__(self,   cascade_test_size=0.2, cascade_layer=5, min_sample_cascade=0.05, tolerance=0.0, dataname=None):
         self.cascade_test_size = cascade_test_size
@@ -51,7 +51,7 @@ class GCForest:
         pred_prob = self.predict_proba(X,y)
         return np.argmax(pred_prob, axis=1)
 
-
+    # Multi-layered forest.
     def cascade_forest(self, X, y,if_y_is_logical_use):
         X = X.reset_index(drop=True)
         y = y.reset_index(drop=True)
@@ -142,7 +142,7 @@ class GCForest:
         return arffpath
 
 
-
+    # Single-layer forest.
     def _cascade_layer(self, X, y,if_y_is_logical_use, layer=0):
         X=X.reset_index(drop=True)
         y=y.reset_index(drop=True)
@@ -229,7 +229,7 @@ class GCForest:
         return prf_crf_pred,accu_list
 
 
-
+    # Used to evaluate whether to add another layer to the forest.
     def _cascade_evaluation(self, X_valid, y_valid):
         predict_proba_list,accu_list=self.cascade_forest(X_valid,y_valid,if_y_is_logical_use=False)
         casc_pred_prob = np.mean(predict_proba_list, axis=0)
@@ -240,6 +240,7 @@ class GCForest:
 
         return casc_accuracy
 
+    # Generate the feature vector for the current layer of the forest.
     def _create_feat_arr(self, X, prf_crf_pred):
         swap_pred = np.swapaxes(prf_crf_pred, 0, 1)
         add_feat = swap_pred.reshape([np.shape(X)[0], -1])
@@ -250,6 +251,8 @@ class GCForest:
 
         return feat_arr
 
+
+# Convert the labels to integers.
 def trans_to_int(target_test,dataname):
     global dic_arff_head
     targers_str=dic_arff_head[dataname][-1]
@@ -261,6 +264,8 @@ def trans_to_int(target_test,dataname):
         target_test_int.loc[target_test_int.iloc[:, 0] == value, 0] = index
     target_test_int = target_test_int.astype(int).values
     return target_test_int
+
+
 
 def main(data_train,data_test,target_train,target_test,dataname,if_is_encoded=False):
 
